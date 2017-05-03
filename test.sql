@@ -1,0 +1,507 @@
+select * from bs07.dbo.C_CUSTOMER_INFORMATION where CUSTOMER_TYPE = '个人会员';
+--
+select * from bs07.dbo.C_CUSTOMER_INFORMATION where len(CUSTOMER_NAME) > 1
+select * from bs07.dbo.C_CUSTOMER_INFORMATION where len(CUSTOMER_NAME) = 0
+select * from bs07.dbo.C_CUSTOMER_INFORMATION where CUSTOMER_NAME = ''
+select * from C_CUSTOMER_INFORMATION where CUSTOMER_NAME = ''
+--市场需求：
+--在已经产生交易的用户中年龄的所占比例情况
+select customer_name,datediff(year,convert(smalldatetime,substring(CUSTOMER_ID_CARD,7,8)),getdate()) as Age,
+convert(smalldatetime,substring(CUSTOMER_ID_CARD,7,8)) as Birthday,
+case
+when len(CUSTOMER_ID_CARD) = 18 and cast(substring(CUSTOMER_ID_CARD,17,1) as int) % 2 = 0 then '女'
+when len(CUSTOMER_ID_CARD) = 18 and cast(substring(CUSTOMER_ID_CARD,17,1) as int) % 2 = 1 then '男'
+else null end  as sex,
+CUSTOMER_SEX,CUSTOMER_BIRTHDAY
+from bs07.dbo.C_CUSTOMER_INFORMATION where CUSTOMER_CERTIFICATE_TYPE = '身份证' and LEN(CUSTOMER_ID_CARD) = 18
+
+--在订单表中查询用户信息
+SELECT CUSTOMER_ID, CUSTOMER_NAME,CUSTOMER_ID_CARD,CUSTOMER_PHONE,CUSTOMER_SEX,CUSTOMER_BIRTHDAY 
+FROM bs07.dbo.C_CUSTOMER_INFORMATION
+where CUSTOMER_ID in (select distinct(CUSTOMER_ID) from bs07.dbo.R_RV_BOOK_INFORMATION where RV_ID is not NULL)
+--查询2016年各月份成功租车频次。
+SELECT month([RENT_START_TIME]),COUNT(*) FROM bs07.dbo.R_RV_BOOK_INFORMATION 
+where RV_ID is not NULL and year([RENT_START_TIME]) = '2016' group by month([RENT_START_TIME]) 
+
+
+SELECT CUSTOMER_ID, CUSTOMER_NAME,CUSTOMER_ID_CARD,CUSTOMER_PHONE,CUSTOMER_SEX,CUSTOMER_BIRTHDAY 
+FROM bs07.dbo.C_CUSTOMER_INFORMATION
+where CUSTOMER_ID in (select distinct(CUSTOMER_ID) from bs07.dbo.R_RV_BOOK_INFORMATION where RV_ID is not NULL)
+and CUSTOMER_CERTIFICATE_TYPE = '身份证'
+
+--平台用手机注册的用户数
+SELECT COUNT(*) FROM bs07.dbo.C_CUSTOMER_INFORMATION;
+--平台个人会员数
+SELECT COUNT(*) FROM bs07.dbo.C_CUSTOMER_INFORMATION where CUSTOMER_TYPE = '个人会员'
+--平台企业会员数
+SELECT COUNT(*) FROM bs07.dbo.C_CUSTOMER_INFORMATION where CUSTOMER_TYPE = '企业会员'
+
+--填写身份证信息数 
+SELECT COUNT(*) FROM bs07.dbo.C_CUSTOMER_INFORMATION where CUSTOMER_CERTIFICATE_TYPE = '身份证';
+--成功租赁车次
+SELECT COUNT(*) from bs07.dbo.R_RV_BOOK_INFORMATION where RV_ID is not NULL;
+SELECT COUNT(*) from bs07.dbo.R_RV_BOOK_INFORMATION where STATE >2 and STATE <>9
+--成功租赁人次,去重用户
+SELECT COUNT(DISTINCT(CUSTOMER_ID)) from bs07.dbo.R_RV_BOOK_INFORMATION where RV_ID is not NULL;
+--按月份统计租赁次数（车）
+SELECT month([RENT_START_TIME]) as '月份',COUNT(*) as '车次' FROM bs07.dbo.R_RV_BOOK_INFORMATION 
+where RV_ID is not NULL and year([RENT_START_TIME]) = '2016' group by month([RENT_START_TIME]) 
+--B\C用户历史租车次数
+SELECT CUSTOMER_TYPE,COUNT(CUSTOMER_TYPE) as '用户数'FROM bs07.dbo.C_CUSTOMER_INFORMATION 
+where CUSTOMER_ID in (SELECT DISTINCT(CUSTOMER_ID) from bs07.dbo.R_RV_BOOK_INFORMATION where RV_ID is not NULL)
+GROUP BY CUSTOMER_TYPE
+--去重用户后每月租车C端用户数（含重复用户不同月份统计）
+SELECT month([RENT_START_TIME]) as '月份',COUNT(DISTINCT(CUSTOMER_ID)) as 'C端用户数' from bs07.dbo.R_RV_BOOK_INFORMATION 
+where RV_ID is not NULL and year([RENT_START_TIME]) = '2016' and CUSTOMER_ID IN 
+(SELECT CUSTOMER_ID FROM bs07.dbo.C_CUSTOMER_INFORMATION where CUSTOMER_TYPE = '个人会员')
+group by month([RENT_START_TIME])
+--去重用户后每月租车B端用户数（含重复用户不同月份统计）
+SELECT month([RENT_START_TIME]) as '月份',COUNT(DISTINCT(CUSTOMER_ID)) as 'B端用户数' from bs07.dbo.R_RV_BOOK_INFORMATION 
+where RV_ID is not NULL and year([RENT_START_TIME]) = '2016' and CUSTOMER_ID IN 
+(SELECT CUSTOMER_ID FROM bs07.dbo.C_CUSTOMER_INFORMATION where CUSTOMER_TYPE = '企业会员')
+group by month([RENT_START_TIME])
+--历史成功租车类型
+SELECT RV_MODELS_ID,COUNT(RV_MODELS_ID) as '车辆次数' FROM bs07.dbo.R_RV_BOOK_INFORMATION  
+where RV_ID is not NULL GROUP BY RV_MODELS_ID
+--历史安月成功租车类型
+SELECT month([RENT_START_TIME]) as '月份',RV_MODELS_ID,COUNT(RV_MODELS_ID) as '车辆次数'
+FROM bs07.dbo.R_RV_BOOK_INFORMATION  
+where RV_ID is not NULL and year([RENT_START_TIME]) = '2016'
+GROUP BY month([RENT_START_TIME]),RV_MODELS_ID
+ORDER BY month([RENT_START_TIME])
+
+--用户租赁车辆详情 （时间点数据）
+SELECT (CASE WHEN STATE = 0 THEN '用户取消' 
+WHEN STATE = 1 THEN '待确认' 
+WHEN STATE = 3 THEN '待准备' 
+WHEN STATE = 4 THEN '待提车' 
+WHEN STATE = 5 THEN '带还车' 
+WHEN STATE = 7 THEN '待退款' 
+WHEN STATE = 2 THEN '待支付'
+WHEN STATE = 6 THEN '待结算'
+WHEN STATE = 8 THEN '结束'
+WHEN STATE = 9 THEN '系统取消'
+ELSE '其他' END) as '房车订单状态'
+,COUNT(*) as '次数' from bs07.dbo.R_RV_BOOK_INFORMATION GROUP BY STATE
+
+
+
+--------------------------------------
+-----物品
+--每个月内内仓库所有物品入库量的总和
+SELECT month([OPERATE_TIME]) as '月份',sum(IN_NUMBER) as '入库数量' 
+FROM bs07.dbo.G_IN_GOODS_INFO GROUP BY month([OPERATE_TIME])
+--每个月内内仓库所有物品出库量的总和
+SELECT month(TICKET_MAKER_DATE) as '月份',sum(b.GOODS_NUMBER) as '入库数量' FROM bs07.dbo.G_GOODS_OUT_MANAGEMENT as a 
+left join( SELECT * FROM bs07.dbo.G_OUT_GOODS_INFO) as b 
+on a.GOODS_OUT_ID = b.GOODS_OUT_ID
+GROUP BY month(TICKET_MAKER_DATE)
+
+--每个月内内仓库所有物品入库量的总和
+SELECT month([OPERATE_TIME]) as '月份',sum(IN_NUMBER) as '入库数量' 
+FROM bs07.dbo.G_IN_GOODS_INFO GROUP BY month([OPERATE_TIME])
+--每个月内内仓库所有物品出库量的总和
+SELECT month(TICKET_MAKER_DATE) as '月份',sum(b.GOODS_NUMBER) as '入库数量' FROM bs07.dbo.G_GOODS_OUT_MANAGEMENT as a 
+left join( SELECT * FROM bs07.dbo.G_OUT_GOODS_INFO) as b 
+on a.GOODS_OUT_ID = b.GOODS_OUT_ID
+GROUP BY month(TICKET_MAKER_DATE)
+
+--当前库存量
+SELECT sum(INSETOCK_NUMBER) as '当前累计库存量' FROM bs07.dbo.G_INSTOCK_TABLE as a 
+left join(SELECT * FROM bs07.dbo.G_GOODS_INFO) as b
+on a.goods_id = b.goods_id
+
+--各月份各物品的出库数量
+SELECT month(a.TICKET_MAKER_DATE) as '月份',b.GOODS_NAME as '物品',SUM(b.GOODS_NUMBER) as '每月出库数量' from bs07.dbo.G_GOODS_OUT_MANAGEMENT as a 
+LEFT JOIN (SELECT * from bs07.dbo.G_OUT_GOODS_INFO ) as b 
+on a.GOODS_OUT_ID = b.GOODS_OUT_ID 
+where a.TICKET_MAKER_DATE > '2016/5/1'
+GROUP BY month(a.TICKET_MAKER_DATE),b.GOODS_NAME
+ORDER BY month(a.TICKET_MAKER_DATE)
+--各月份各物品的出库数量(5月份以后)
+SELECT MONTH(a.OPERATE_TIME) as '月份',b.GOODS_NAME as '物品',sum(IN_NUMBER) as '每月入库数量' from bs07.dbo.G_IN_GOODS_INFO as a
+LEFT JOIN (SELECT * from bs07.dbo.G_GOODS_INFO ) as b on a.GOODS_ID = b.GOODS_ID 
+where a.OPERATE_TIME > '2016/5/1'
+GROUP BY MONTH(a.OPERATE_TIME),b.GOODS_NAME
+ORDER BY MONTH(a.OPERATE_TIME)
+--历史出库类型
+SELECT DISTINCT(STOREHOUSE_OUT_MODE_TEXT) as '出库类型',COUNT(*) as '出库数量'  from bs07.dbo.G_GOODS_OUT_MANAGEMENT 
+where TICKET_MAKER_DATE > '2016/5/1' and STATE ='已处理'
+GROUP BY STOREHOUSE_OUT_MODE_TEXT
+--出库类型 (5月份以后)
+SELECT MONTH(TICKET_MAKER_DATE) as '月份',STOREHOUSE_OUT_MODE_TEXT as '出库类型',COUNT(*) as '出库数量'  from bs07.dbo.G_GOODS_OUT_MANAGEMENT 
+where TICKET_MAKER_DATE > '2016/5/1' and STATE ='已处理'
+GROUP BY MONTH(TICKET_MAKER_DATE),STOREHOUSE_OUT_MODE_TEXT
+ORDER BY MONTH(TICKET_MAKER_DATE)
+--物品类别及数量
+SELECT substring(GOODS_TYPE,1,2) as '物品类别',count(*) as '类别数量' 
+FROM bs07.dbo.G_GOODS_INFO GROUP BY substring(GOODS_TYPE,1,2)
+--物品上下架数量
+SELECT IS_SHELVE,COUNT(*) FROM bs07.dbo.G_GOODS_INFO 
+where IS_SHELVE is not NULL and IS_SHELVE <> ''
+GROUP BY IS_SHELVE
+--物品状态类型
+SELECT IS_SHELVE as '物品状态',COUNT(*) as '状态数量'FROM bs07.dbo.G_GOODS_INFO 
+GROUP BY IS_SHELVE
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------
+--历史结算方式
+SELECT SETTLEMENT_METHOD as '结算方式', count(SETTLEMENT_METHOD) as '历史结算次数' 
+from bs07.dbo.F_SETTLEMENT_MANAGEMENT GROUP BY SETTLEMENT_METHOD
+--本月结算方式
+SELECT MONTH(SETTLEMENT_DATE),SETTLEMENT_METHOD as '结算方式', count(SETTLEMENT_METHOD) as '历史结算次数' 
+from bs07.dbo.F_SETTLEMENT_MANAGEMENT GROUP BY SETTLEMENT_METHOD ,MONTH(SETTLEMENT_DATE)
+
+--现金结算（物品和房车）
+SELECT MONTH(SETTLEMENT_DATE),sum(CASH_MONEY) as '合计现金金额', count(CASH_MONEY) as '现金结算次数' 
+from bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where CASH_MONEY <> 0
+GROUP BY MONTH(SETTLEMENT_DATE)
+--转账结算（物品和房车）
+SELECT MONTH(SETTLEMENT_DATE),sum(TRASFER_MONEY) as '合计转账金额', count(TRASFER_MONEY) as '转账结算次数' 
+from bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where TRASFER_MONEY <> 0
+GROUP BY MONTH(SETTLEMENT_DATE)
+--支付宝结算（物品和房车）
+SELECT MONTH(SETTLEMENT_DATE),sum(ALIPAY_MONEY) as '合计支付宝金额', count(ALIPAY_MONEY) as '支付宝结算次数' 
+from bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where ALIPAY_MONEY <> 0
+GROUP BY MONTH(SETTLEMENT_DATE)
+--07钱包结算（物品和房车）
+SELECT MONTH(SETTLEMENT_DATE),sum(WALLET07_MONEY) as '合计07钱包金额', count(WALLET07_MONEY) as '07钱包结算次数' 
+from bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where WALLET07_MONEY <> 0
+GROUP BY MONTH(SETTLEMENT_DATE)
+--微信结算（物品和房车）
+SELECT MONTH(SETTLEMENT_DATE),sum(WECHATPAY_MONEY) as '合计微信金额', count(WECHATPAY_MONEY) as '微信结算次数' 
+from bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where WECHATPAY_MONEY <> 0
+GROUP BY MONTH(SETTLEMENT_DATE)
+
+
+
+
+
+
+--历史实际收入
+SELECT MONTH(SETTLEMENT_DATE),sum(REAL_REVENUE_MONEY) FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT GROUP BY MONTH(SETTLEMENT_DATE)
+--租赁房车合计的收入
+SELECT MONTH(SETTLEMENT_DATE),sum(REAL_REVENUE_MONEY) FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where MEMBER_NO is not NULL
+GROUP BY MONTH(SETTLEMENT_DATE)
+--出售物品的收入
+SELECT MONTH(SETTLEMENT_DATE),sum(REAL_REVENUE_MONEY) FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where MEMBER_NO = ''
+GROUP BY MONTH(SETTLEMENT_DATE)
+
+--违章情况
+SELECT MONTH(VIOLATION_TIME) as '月份',count(VIOLATION_LOCATION)as '违章次数' 
+from bs07.dbo.R_VIOLATION_CHECK where VIOLATION_LOCATION <> '' GROUP BY MONTH(VIOLATION_TIME)
+--按月份划分租赁房车次数
+SELECT MONTH(SETTLEMENT_DATE) as '月份',count(*) as '租车次数' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' and year(SETTLEMENT_DATE) = '2016'
+GROUP BY MONTH(SETTLEMENT_DATE)
+--按季度划分租赁房车次数
+SELECT datepart(quarter,SETTLEMENT_DATE) as '季度',count(*) as '租车次数' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' and year(SETTLEMENT_DATE) = '2016'
+GROUP BY datepart(quarter,SETTLEMENT_DATE)
+--按周期划分租赁房车次数
+SELECT datepart(wk,SETTLEMENT_DATE) as '周期',count(*) as '租车次数' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' and year(SETTLEMENT_DATE) = '2016'
+GROUP BY datepart(wk,SETTLEMENT_DATE)
+
+--按月划分实际取车次数
+SELECT MONTH(SETTLEMENT_DATE) as '月份',count(AC_TAKE_RV_MONEY) as '取车次数' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' and AC_TAKE_RV_MONEY > 0 and year(SETTLEMENT_DATE) = '2016'
+GROUP BY MONTH(SETTLEMENT_DATE)
+
+--每月租赁房车租金合计（租房车）
+SELECT MONTH(SETTLEMENT_DATE) as '月份',sum(AC_RV_RENT_MONEY) as '房车租金' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' and year(SETTLEMENT_DATE) = '2016'
+GROUP BY MONTH(SETTLEMENT_DATE)
+--每月租赁物品租金合计（租房车）
+SELECT MONTH(SETTLEMENT_DATE) as '月份',sum(GOODS_RENT_MONEY) as '物品租金' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' and year(SETTLEMENT_DATE) = '2016'
+GROUP BY MONTH(SETTLEMENT_DATE)
+--每月物品销售金额合计（租房车）
+SELECT MONTH(SETTLEMENT_DATE) as '月份',sum(GOODS_SALE_MONEY) as '物品销售金' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' and year(SETTLEMENT_DATE) = '2016'
+GROUP BY MONTH(SETTLEMENT_DATE)
+--单独销售物品
+SELECT MONTH(SETTLEMENT_DATE) as '月份',sum(GOODS_SALE_MONEY) as '物品销售金' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'SB' and year(SETTLEMENT_DATE) = '2016'
+GROUP BY MONTH(SETTLEMENT_DATE)
+--同上
+SELECT MONTH(SETTLEMENT_DATE),sum(REAL_REVENUE_MONEY) FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where MEMBER_NO = ''
+GROUP BY MONTH(SETTLEMENT_DATE)
+
+--按月划分实际取车费用
+SELECT MONTH(SETTLEMENT_DATE) as '月份',sum(AC_TAKE_RV_MONEY) as '取车费用' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' and AC_TAKE_RV_MONEY > 0 and year(SETTLEMENT_DATE) = '2016'
+GROUP BY MONTH(SETTLEMENT_DATE)
+
+
+-- 按照历史成功租车天数
+SELECT datediff(DAY,RENT_START_TIME,RENT_END_TIME) as '租赁天数',count(*) as '租赁次数'
+from bs07.dbo.R_RV_BOOK_INFORMATION 
+where RV_ID is not null 
+GROUP BY datediff(DAY,RENT_START_TIME,RENT_END_TIME)
+ORDER BY count(*) DESC
+
+SELECT RV_CHECK_TIME FROM bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车前'
+SELECT RV_CHECK_TIME FROM bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车后'
+
+SELECT datediff(DAY,a.RV_CHECK_TIME,b.RV_CHECK_TIME) as '实际租车天数',COUNT(*) as '租赁次数' FROM bs07.dbo.R_RV_BACK_INFORMATION  as a 
+LEFT JOIN (SELECT * FROM bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车后') as b
+on a.RENT_RV_ID = b.RENT_RV_ID
+WHERE a.RV_IS_BACK = '还车前'
+GROUP BY datediff(DAY,a.RV_CHECK_TIME,b.RV_CHECK_TIME)
+
+
+
+
+---还车天数
+SELECT datediff(DAY,RENT_END_TIME,RV_CHECK_TIME) as '与预定还车天数差值',count(*) as '次数' from bs07.dbo.R_RV_BACK_INFORMATION  as a
+LEFT JOIN (SELECT * from bs07.dbo.R_RV_BOOK_INFORMATION where RV_ID is not null ) as b
+on a.RENT_RV_ID = b.BOOK_RV_ID where a.RV_IS_BACK = '还车后'
+GROUP BY datediff(DAY,RENT_END_TIME,RV_CHECK_TIME)
+
+SELECT RENT_RV_ID,RV_CHECK_TIME from bs07.dbo.R_RV_BACK_INFORMATION
+where RV_IS_BACK = '还车后'
+ORDER BY RENT_RV_ID
+
+
+--提前换车，退单
+SELECT MONTH(RENT_START_TIME),BOOK_RV_NO,DATEDIFF(DAY, RENT_END_TIME, ACTUAL_RETURN_TIME) from bs07.dbo.R_RV_BOOK_INFORMATION
+WHERE ACTUAL_RETURN_TIME is not NULL and RV_ID is not NULL
+--退单
+SELECT b.DICTIONARYNAME,count(*) from bs07.dbo.R_RV_BOOK_INFORMATION AS a 
+inner join (SELECT DICTIONARYVALUE,DICTIONARYNAME from bs07.dbo.SYS_DICTIONARY where CATALOGID = '03') as b
+on a.STATE = b.DICTIONARYVALUE
+GROUP BY b.DICTIONARYNAME
+
+SELECT STATE,COUNT(*) from bs07.dbo.R_RV_BOOK_INFORMATION GROUP BY STATE
+--缺少对state=0 的解释
+SELECT DICTIONARYVALUE,DICTIONARYNAME from bs07.dbo.SYS_DICTIONARY where CATALOGID = '03' order by DICTIONARYVALUE
+
+
+
+
+
+
+--历史上每天房车的保证金结算清单 RV_DEPOSIT_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',count(RV_DEPOSIT_MONEY) as '租车单数' ,sum(RV_DEPOSIT_MONEY) as '房车保证金' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+
+--历史上每天房车的租金结算清单（当天发生的租金 不是最终结算的实际租金） RV_RENT_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(RV_RENT_MONEY) as '房车租金' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+
+--历史上每天房车折扣金额（代金券）DISCOUNT_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(DISCOUNT_MONEY) as '折扣金额' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+having sum(DISCOUNT_MONEY) > 0
+
+
+--应付款 SHOULD_REVENUE_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(SHOULD_REVENUE_MONEY) as '应付款' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+having sum(SHOULD_REVENUE_MONEY) > 0
+
+--实际收入 REAL_REVENUE_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(REAL_REVENUE_MONEY) as '应付款' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+having sum(REAL_REVENUE_MONEY) > 0
+
+--维养费用 MAINTENANCE_COSTS
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(MAINTENANCE_COSTS) as '应付款' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+having sum(MAINTENANCE_COSTS) > 0
+
+--历史上物品租赁金额结算清单 GOODS_RENT_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(GOODS_RENT_MONEY) as '物品租金' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+HAVING sum(GOODS_RENT_MONEY) > 0
+
+--历史上物品出售金额结算清单 GOODS_SALE_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(GOODS_SALE_MONEY) as '物品售价' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+
+--提前换车，退单
+
+/*SELECT CONVERT(char(10), RENT_START_TIME, 120) as '日期',BOOK_RV_NO,DATEDIFF(DAY, RENT_END_TIME, ACTUAL_RETURN_TIME) from bs07.dbo.R_RV_BOOK_INFORMATION
+WHERE ACTUAL_RETURN_TIME is not NULL and RV_ID is not NULL
+*/
+
+
+--订单修改（取车时间比较）
+/*
+--明细数据
+SELECT CONVERT(char(10), RV_CHECK_TIME, 120) as '日期',BOOK_RV_NO ,DATEDIFF(DAY, RENT_START_TIME, RV_CHECK_TIME) as '天数' 
+from bs07.dbo.R_RV_BOOK_INFORMATION as a
+LEFT JOIN (SELECT RENT_RV_ID,RV_CHECK_TIME from bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车前') as b 
+on a.BOOK_RV_NO = b.RENT_RV_ID
+where DATEDIFF(DAY, RENT_START_TIME, RV_CHECK_TIME) > 1
+
+--计数晚取车次数
+SELECT CONVERT(char(10), RV_CHECK_TIME, 120) as '日期',count(BOOK_RV_NO) as '晚取车次数'
+from bs07.dbo.R_RV_BOOK_INFORMATION as a
+LEFT JOIN (SELECT RENT_RV_ID,RV_CHECK_TIME from bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车前') as b 
+on a.BOOK_RV_NO = b.RENT_RV_ID
+where DATEDIFF(DAY, RENT_START_TIME, RV_CHECK_TIME) > 1
+GROUP BY CONVERT(char(10), RV_CHECK_TIME, 120)
+
+--订单修改（还车时间比较）
+SELECT CONVERT(char(10), RV_CHECK_TIME, 120) as '日期',BOOK_RV_NO ,DATEDIFF(DAY, RENT_END_TIME, RV_CHECK_TIME) as '天数' 
+from bs07.dbo.R_RV_BOOK_INFORMATION as a
+LEFT JOIN (SELECT RENT_RV_ID,RV_CHECK_TIME from bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车后') as b 
+on a.BOOK_RV_NO = b.RENT_RV_ID
+where DATEDIFF(DAY, RENT_END_TIME, RV_CHECK_TIME) > 1
+
+--计数晚还车次数
+SELECT CONVERT(char(10), RV_CHECK_TIME, 120) as '日期',count(BOOK_RV_NO) as '晚还车次数'
+from bs07.dbo.R_RV_BOOK_INFORMATION as a
+LEFT JOIN (SELECT RENT_RV_ID,RV_CHECK_TIME from bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车后') as b 
+on a.BOOK_RV_NO = b.RENT_RV_ID
+where DATEDIFF(DAY, RENT_END_TIME, RV_CHECK_TIME) > 1
+GROUP BY CONVERT(char(10), RV_CHECK_TIME, 120)
+*/
+---------
+SELECT a.dt as '日期',sum(a.n) as '订单修改次数'FROM 
+(SELECT CONVERT(char(10), RV_CHECK_TIME, 120) as dt,count(BOOK_RV_NO) as n
+from bs07.dbo.R_RV_BOOK_INFORMATION as a
+LEFT JOIN (SELECT RENT_RV_ID,RV_CHECK_TIME from bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车前') as b 
+on a.BOOK_RV_NO = b.RENT_RV_ID
+where DATEDIFF(DAY, RENT_START_TIME, RV_CHECK_TIME) > 1
+GROUP BY CONVERT(char(10), RV_CHECK_TIME, 120)
+UNION all 
+SELECT CONVERT(char(10), RV_CHECK_TIME, 120) as dt,count(BOOK_RV_NO) as n
+from bs07.dbo.R_RV_BOOK_INFORMATION as a
+LEFT JOIN (SELECT RENT_RV_ID,RV_CHECK_TIME from bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车后') as b 
+on a.BOOK_RV_NO = b.RENT_RV_ID
+where DATEDIFF(DAY, RENT_END_TIME, RV_CHECK_TIME) > 1
+GROUP BY CONVERT(char(10), RV_CHECK_TIME, 120)) as a
+GROUP BY a.dt
+
+--历史上代驾金额结算清单 DRIVE_RV_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(DRIVE_RV_MONEY) as '代驾金额' 
+FROM bs07.dbo.F_SETTLEMENT_MANAGEMENT 
+where substring(book_rv_no,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+HAVING sum(DRIVE_RV_MONEY) > 0
+
+--历史上违章金额结算清单 VIOLATION_FINE_MONEY
+SELECT CONVERT(char(10), VIOLATION_TIME, 120) as '日期',
+COUNT(VIOLATION_FINE_MONEY) as '违章次数' ,
+sum(VIOLATION_FINE_MONEY) as '违章金额' 
+from bs07.dbo.R_VIOLATION_CHECK where VIOLATION_LOCATION <> '' 
+GROUP BY CONVERT(char(10), VIOLATION_TIME, 120)
+
+------------
+/*--历史上取车费用结算清单 TAKE_RV_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(TAKE_RV_MONEY) as '送车费用合计' from bs07.dbo.F_SETTLEMENT_MANAGEMENT
+where substring(BOOK_RV_NO,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+HAVING sum(TAKE_RV_MONEY) > 0
+
+--历史上每天送车费用结算清单 SEND_RV_MONEY
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(SEND_RV_MONEY) as '送车费用合计' from bs07.dbo.F_SETTLEMENT_MANAGEMENT
+where substring(BOOK_RV_NO,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+HAVING sum(SEND_RV_MONEY) > 0
+*/
+--历史上取送车费用结算清单
+SELECT a.dt as '日期',sum(a.n) as '取还车费用合计'FROM 
+(SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as dt,sum(TAKE_RV_MONEY) as n from bs07.dbo.F_SETTLEMENT_MANAGEMENT
+where substring(BOOK_RV_NO,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+HAVING sum(TAKE_RV_MONEY) > 0 
+UNION all 
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as dt,sum(SEND_RV_MONEY) as n from bs07.dbo.F_SETTLEMENT_MANAGEMENT
+where substring(BOOK_RV_NO,1,2) = 'RA' 
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+HAVING sum(SEND_RV_MONEY) > 0) as a
+GROUP BY a.dt
+ORDER BY a.dt
+
+--车辆经纬度查询
+SELECT * FROM bs07Position.dbo.E_REALTIME_DRIVINGINFO as a 
+where SYSTEM_TIME = (SELECT max(SYSTEM_TIME) FROM bs07Position.dbo.E_REALTIME_DRIVINGINFO 
+where a.CAR_NO = CAR_NO AND  SYSTEM_TIME < '2016-08-26' )
+and substring(CAR_NO,1,1) = '陕'
+
+
+
+
+SELECT CUSTOMER_ID,RENT_START_TIME,BOOK_RV_NO FROM bs07.dbo.R_RV_BOOK_INFORMATION where STATE > 3 and STATE <> 9
+--用户租赁频次
+SELECT CUSTOMER_ID,count(CUSTOMER_ID) as n  FROM bs07.dbo.R_RV_BOOK_INFORMATION 
+where STATE > 3 and STATE <> 9 GROUP BY CUSTOMER_ID ORDER BY n DESC
+--本月新增租赁用户数
+
+SELECT COUNT(DISTINCT(CUSTOMER_ID)) as '本月新增租赁用户数' from bs07.dbo.R_RV_BOOK_INFORMATION 
+where STATE > 3 and STATE <> 9 and RENT_START_TIME BETWEEN '2016/09/01' and '2016/09/30'
+and CUSTOMER_ID not in 
+(SELECT CUSTOMER_ID FROM bs07.dbo.R_RV_BOOK_INFORMATION 
+where STATE > 3 and STATE <> 9 and RENT_START_TIME < '2016/09/01')
+
+
+--统计期内节假日还车费用
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(AC_SEND_RV_MONEY) as '节假日还车费用' 
+from  bs07.dbo.F_SETTLEMENT_MANAGEMENT
+where substring(BOOK_RV_NO,1,2) = 'RA' and 
+SETTLEMENT_DATE BETWEEN '2016/10/1' and '2016/10/30'
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+HAVING sum(AC_SEND_RV_MONEY) > 0
+--统计期内节假日取车费用
+SELECT CONVERT(char(10), SETTLEMENT_DATE, 120) as '日期',sum(AC_TAKE_RV_MONEY) as '节假日还车费用' 
+from  bs07.dbo.F_SETTLEMENT_MANAGEMENT
+where substring(BOOK_RV_NO,1,2) = 'RA' and 
+SETTLEMENT_DATE BETWEEN '2016/10/1' and '2016/10/30'
+GROUP BY CONVERT(char(10), SETTLEMENT_DATE, 120)
+HAVING sum(AC_TAKE_RV_MONEY) > 0
+
+
+-- 历史租车单的租赁时间（天）
+SELECT  MONTH(a.RV_CHECK_TIME) as '月份',a.RENT_RV_ID as '租车单号',datediff(DAY,a.RV_CHECK_TIME,b.RV_CHECK_TIME) as '租赁时长（天）'  
+FROM (SELECT RENT_RV_ID ,RV_CHECK_TIME from bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车前')  as a 
+INNER JOIN
+(SELECT RENT_RV_ID ,RV_CHECK_TIME from bs07.dbo.R_RV_BACK_INFORMATION where RV_IS_BACK = '还车后' ) as b 
+on a.RENT_RV_ID = b.RENT_RV_ID
+where datediff(DAY,a.RV_CHECK_TIME,b.RV_CHECK_TIME) > 0
+ORDER BY MONTH(a.RV_CHECK_TIME) desc , a.RENT_RV_ID
